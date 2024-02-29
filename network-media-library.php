@@ -334,6 +334,20 @@ add_filter('wp_prepare_attachment_for_js', function(array $response, \WP_Post $a
 }, 0, 3);
 
 /**
+ * Remove delete button from list view
+ */
+
+add_filter('media_row_actions', __NAMESPACE__ . '\nml_media_row_actions_remove_delete_link_list_view');
+add_filter('bulk_actions-upload', __NAMESPACE__ . '\nml_media_row_actions_remove_delete_link_list_view');
+function nml_media_row_actions_remove_delete_link_list_view($actions){
+	if(!is_media_site()){
+		unset($actions['delete']);
+	}
+	
+	return $actions;
+}
+
+/**
  * Filters the pre-dispatch value of REST API requests in order to switch to the network media library site when
  * querying media.
  *
