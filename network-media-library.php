@@ -491,6 +491,7 @@ class ACF_Value_Filter{
 		$field_types = [
 			'image',
 			'file',
+			'gallery',
 		];
 		
 		foreach($field_types as $type){
@@ -500,7 +501,26 @@ class ACF_Value_Filter{
 	}
 	
 	/**
-	 * Fiters the return value when using field retrieval functions in Advanced Custom Fields.
+	 * Transforms an Advanced Custom Field into the format specified return format.
+	 *
+	 * @param string $return_format The expected format to be returned - specified in the ACF field.
+	 * @param mixed  $value         The field value.
+	 *
+	 * @return mixed The ACF field's value in the new format.
+	 */
+	private function transform_acf_to_return_format($return_format, $value){
+		switch($return_format){
+			case 'url':
+				return wp_get_attachment_url($value);
+			case 'array':
+				return acf_get_attachment($value);
+		}
+		
+		return $value;
+	}
+	
+	/**
+	 * Filters the return value when using field retrieval functions in Advanced Custom Fields.
 	 *
 	 * @param mixed      $value   The field value.
 	 * @param int|string $post_id The post ID for this value.
@@ -511,19 +531,14 @@ class ACF_Value_Filter{
 	public function filter_acf_attachment_load_value($value, $post_id, array $field){
 		$image = $value;
 		
-		if(!is_media_site() && !is_admin()){
-			switch_to_media_site();
-			
-			switch($field['return_format']){
-				case 'url':
-					$image = wp_get_attachment_url($value);
-					break;
-				case 'array':
-					$image = acf_get_attachment($value);
-					break;
+		if(!is_admin()){
+			if(!is_media_site()){
+				switch_to_media_site();
+				$image = $this->transform_acf_to_return_format($field['return_format'], $value);
+				restore_current_blog();
+			}else{
+				$image = $this->transform_acf_to_return_format($field['return_format'], $value);
 			}
-			
-			restore_current_blog();
 		}
 		
 		$this->value = $image;
@@ -532,7 +547,7 @@ class ACF_Value_Filter{
 	}
 	
 	/**
-	 * Fiters the optionally formatted value when using field retrieval functions in Advanced Custom Fields.
+	 * Filters the optionally formatted value when using field retrieval functions in Advanced Custom Fields.
 	 *
 	 * @param mixed      $value   The field value.
 	 * @param int|string $post_id The post ID for this value.
@@ -563,8 +578,10 @@ class ACF_Field_Rendering{
 	 * Sets up the necessary action and filter callbacks.
 	 */
 	public function __construct(){
-		add_action('acf/render_field', [$this, 'maybe_restore_current_blog'], - 999);
+		add_action('acf/render_field', [$this, 'maybe_restore_current_blog'], 999);
+		add_action('acf/render_field/type=image', [$this, 'maybe_switch_to_media_site'], 0);
 		add_action('acf/render_field/type=file', [$this, 'maybe_switch_to_media_site'], 0);
+		add_action('acf/render_field/type=gallery', [$this, 'maybe_switch_to_media_site'], 0);
 	}
 	
 	/**
@@ -580,7 +597,7 @@ class ACF_Field_Rendering{
 	 * Switches back to the current site if the previous field triggered a switch to the central media site.
 	 */
 	public function maybe_restore_current_blog(){
-		if(!empty($this->switched)){
+		if($this->switched){
 			restore_current_blog();
 		}
 		
